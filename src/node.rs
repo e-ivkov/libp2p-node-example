@@ -13,6 +13,9 @@ pub const PENDING_TX_FWD_TOPIC: &str = "pending_tx";
 pub const TIME_SYNC_TOPIC: &str = "time_sync";
 pub const BLOCK_VOTE_TOPIC: &str = "block_vote";
 
+//window size of requests to store and use for statistics
+pub const WINDOW_SIZE: usize = 100;
+
 // We create a custom network behaviour that combines floodsub and mDNS.
 // In the future, we want to improve libp2p to make this easier to do.
 // Use the derive to generate delegating NetworkBehaviour impl and require the
@@ -37,7 +40,7 @@ impl NodeBehavior {
             floodsub: Floodsub::new(peer_id),
             mdns,
             ping,
-            stats: Stats::new(100),
+            stats: Stats::new(WINDOW_SIZE),
         })
     }
 }
@@ -67,8 +70,8 @@ impl NetworkBehaviourEventProcess<FloodsubEvent> for NodeBehavior {
             if let [topic] = &message.topics[..] {
                 match &String::from(topic.clone())[..] {
                     PENDING_TX_FWD_TOPIC => println!(
-                        "Received: '{:?}' from {:?}",
-                        String::from_utf8_lossy(&message.data),
+                        "Received pending tx {:?} bytes from {:?}",
+                        message.data.len(),
                         message.source
                     ),
                     _ => println!("Unsupported topic {:?}", topic),

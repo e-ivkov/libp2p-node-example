@@ -8,6 +8,10 @@ edition = "2018"
 
 [dependencies]
 libp2p = "0.16.2"
-async-std = "1.5.0"
 futures = "0.3.4"
 chashmap = "2.2.2"
+rand = "0.7.3"
+
+[dependencies.async-std]
+version = "1.5.0"
+features = ["unstable"]
