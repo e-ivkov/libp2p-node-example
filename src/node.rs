@@ -128,14 +128,18 @@ impl fmt::Display for Stats {
             .clone()
             .into_iter()
             .map(|(peer, durations)| {
-                format!(
-                    "{} {:?}\n",
-                    peer,
-                    durations
-                        .iter()
-                        .fold(Duration::from_secs(0), |acc, x| acc + *x)
-                        / durations.len() as u32
-                )
+                if durations.len() > 0 {
+                    format!(
+                        "{} {:?}\n",
+                        peer,
+                        durations
+                            .iter()
+                            .fold(Duration::from_secs(0), |acc, x| acc + *x)
+                            / durations.len() as u32
+                    )
+                } else {
+                    format!("{} no ping data\n", peer)
+                }
             })
             .collect();
         write!(f, "Average ping for each peer:\n{}", ping_by_peer)
