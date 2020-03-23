@@ -1,5 +1,5 @@
 use libp2p::{
-    floodsub::{Floodsub, FloodsubEvent},
+    floodsub::{Floodsub, FloodsubEvent, Topic},
     mdns::{Mdns, MdnsEvent},
     ping::{Ping, PingEvent, PingSuccess},
     swarm::NetworkBehaviourEventProcess,
@@ -24,11 +24,11 @@ pub struct NodeBehavior {
 }
 
 impl NodeBehavior {
-    pub fn new(peerId: PeerId) -> Result<NodeBehavior, Box<dyn std::error::Error>> {
+    pub fn new(peer_id: PeerId) -> Result<NodeBehavior, Box<dyn std::error::Error>> {
         let mdns = Mdns::new()?;
         let ping = Ping::default();
         Ok(NodeBehavior {
-            floodsub: Floodsub::new(peerId),
+            floodsub: Floodsub::new(peer_id),
             mdns,
             ping,
             ignored_member: false,
@@ -49,7 +49,14 @@ impl NetworkBehaviourEventProcess<FloodsubEvent> for NodeBehavior {
     // Called when `floodsub` produces an event.
     fn inject_event(&mut self, message: FloodsubEvent) {
         if let FloodsubEvent::Message(message) = message {
-            println!("Received: '{:?}' from {:?}", String::from_utf8_lossy(&message.data), message.source);
+            if let [topic] = &message.topics[..]{
+                match &String::from(topic.clone())[..] {
+                    "chat" => println!("Received: '{:?}' from {:?}", String::from_utf8_lossy(&message.data), message.source),
+                    _ => println!("Unsupported topic {:?}", topic)
+                }
+            } else {
+                println!("Received more than 1 topic. Topics: {:?}", message.topics)
+            }
         }
     }
 }
