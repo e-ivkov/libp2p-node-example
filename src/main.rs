@@ -1,17 +1,18 @@
+use crate::node::{NodeBehavior, Stats};
 use async_std::{io, task};
 use futures::{future, prelude::*};
 use libp2p::{
-    Multiaddr,
-    PeerId,
-    Swarm,
-    identity,
     floodsub::{self, FloodsubEvent},
+    identity,
     mdns::Mdns,
     ping::Ping,
-    swarm::NetworkBehaviourEventProcess
+    swarm::NetworkBehaviourEventProcess,
+    Multiaddr, PeerId, Swarm,
 };
-use std::{error::Error, task::{Context, Poll}};
-use crate::node::NodeBehavior;
+use std::{
+    error::Error,
+    task::{Context, Poll},
+};
 
 pub mod node;
 
@@ -32,7 +33,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Create a Swarm to manage peers and events
     let mut swarm = {
         let mut behaviour = NodeBehavior::new(local_peer_id.clone())?;
-
         behaviour.floodsub.subscribe(floodsub_topic.clone());
         Swarm::new(transport, behaviour, local_peer_id)
     };
@@ -55,9 +55,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     task::block_on(future::poll_fn(move |cx: &mut Context| {
         loop {
             match stdin.try_poll_next_unpin(cx)? {
-                Poll::Ready(Some(line)) => swarm.floodsub.publish(floodsub_topic.clone(), line.as_bytes()),
+                Poll::Ready(Some(line)) => {
+                    if line == "stats" {
+                        println!("{}", swarm.stats)
+                    } else {
+                        swarm
+                            .floodsub
+                            .publish(floodsub_topic.clone(), line.as_bytes())
+                    }
+                }
                 Poll::Ready(None) => panic!("Stdin closed"),
-                Poll::Pending => break
+                Poll::Pending => break,
             }
         }
         loop {
@@ -71,7 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             listening = true;
                         }
                     }
-                    break
+                    break;
                 }
             }
         }
