@@ -7,6 +7,11 @@ use libp2p::{
     PeerId,
 };
 
+pub const BLOCK_SYNC_TOPIC: &str = "block_sync";
+pub const PENDING_TX_FWD_TOPIC: &str = "pending_tx";
+pub const TIME_SYNC_TOPIC: &str = "time_sync";
+pub const BLOCK_VOTE_TOPIC: &str = "block_vote";
+
 // We create a custom network behaviour that combines floodsub and mDNS.
 // In the future, we want to improve libp2p to make this easier to do.
 // Use the derive to generate delegating NetworkBehaviour impl and require the
@@ -51,7 +56,7 @@ impl NetworkBehaviourEventProcess<FloodsubEvent> for NodeBehavior {
         if let FloodsubEvent::Message(message) = message {
             if let [topic] = &message.topics[..]{
                 match &String::from(topic.clone())[..] {
-                    "chat" => println!("Received: '{:?}' from {:?}", String::from_utf8_lossy(&message.data), message.source),
+                    PENDING_TX_FWD_TOPIC => println!("Received: '{:?}' from {:?}", String::from_utf8_lossy(&message.data), message.source),
                     _ => println!("Unsupported topic {:?}", topic)
                 }
             } else {

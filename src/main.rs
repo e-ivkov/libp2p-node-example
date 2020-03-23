@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let transport = libp2p::build_development_transport(local_key)?;
 
     // Create a Floodsub topic
-    let floodsub_topic = floodsub::Topic::new("chat");
+    let floodsub_topic = floodsub::Topic::new(node::PENDING_TX_FWD_TOPIC);
 
     // Create a Swarm to manage peers and events
     let mut swarm = {
