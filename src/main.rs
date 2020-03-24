@@ -16,6 +16,8 @@ use libp2p::{
 use std::time::SystemTime;
 use std::{
     error::Error,
+    fs::File,
+    io::prelude::*,
     task::{Context, Poll},
     time::Duration,
 };
@@ -26,6 +28,9 @@ pub mod node;
 //Message size restrictions are 1 MiB, though noticed that sometimes smaller messages also do not propagate
 const TX_BYTES: usize = 1000;
 const TX_INTERVAL_SEC: usize = 5;
+
+//Node lives this much seconds, then it saves the stats to a file and exits
+const NODE_TTL: f64 = 100.0;
 
 fn main() -> Result<(), Box<dyn Error>> {
     //env_logger::init();
@@ -60,6 +65,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Simulate periodic appearance of pending transactions
     let mut pending_tx_stream = stream::interval(Duration::from_secs(TX_INTERVAL_SEC as u64));
+
+    let mut exit_alert = stream::interval(Duration::from_secs_f64(NODE_TTL));
 
     // Listen on all interfaces and whatever port the OS assigns
     Swarm::listen_on(&mut swarm, "/ip4/0.0.0.0/tcp/0".parse()?)?;
@@ -109,6 +116,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
         }
-        Poll::Pending
+        match exit_alert.poll_next_unpin(cx) {
+            Poll::Ready(Some(_)) => {
+                println!("Saving stats");
+                let mut file = File::create("stats.txt")?;
+                file.write_all(swarm.stats.to_string().as_bytes())?;
+                println!("Exiting");
+                Poll::Ready(Ok(()))
+            }
+            Poll::Ready(None) => panic!("Exit stream closed"),
+            Poll::Pending => Poll::Pending,
+        }
     }))
 }

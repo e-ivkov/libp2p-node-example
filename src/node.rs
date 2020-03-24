@@ -46,10 +46,10 @@ impl NodeBehavior {
         let mdns = Mdns::new()?;
         let ping = Ping::default();
         Ok(NodeBehavior {
-            floodsub: Floodsub::new(peer_id),
+            floodsub: Floodsub::new(peer_id.clone()),
             mdns,
             ping,
-            stats: Stats::new(WINDOW_SIZE),
+            stats: Stats::new(WINDOW_SIZE, peer_id),
         })
     }
 }
@@ -137,14 +137,16 @@ pub struct Stats {
     pings_to_peers: CHashMap<PeerId, Vec<Duration>>,
     transmissions_rates: CHashMap<PeerId, Vec<Duration>>,
     window_size: usize,
+    peer_id: PeerId,
 }
 
 impl Stats {
-    pub fn new(window_size: usize) -> Self {
+    pub fn new(window_size: usize, peer_id: PeerId) -> Self {
         Self {
             pings_to_peers: CHashMap::new(),
             transmissions_rates: CHashMap::new(),
             window_size,
+            peer_id,
         }
     }
 }
@@ -187,8 +189,8 @@ impl fmt::Display for Stats {
             .collect();
         write!(
             f,
-            "Average ping for each peer:\n{} Average transmission rate by peer:\n{}",
-            ping_by_peer, transmission_rate_by_peer
+            "{:?}\nAverage ping for each peer:\n{}Average transmission rate by peer:\n{}",
+            self.peer_id, ping_by_peer, transmission_rate_by_peer
         )
     }
 }
