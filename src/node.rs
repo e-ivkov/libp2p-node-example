@@ -1,3 +1,4 @@
+use crate::helper_fns::current_time_millis;
 use chashmap::CHashMap;
 use libp2p::{
     floodsub::{Floodsub, FloodsubEvent, Topic},
@@ -77,11 +78,16 @@ impl NetworkBehaviourEventProcess<FloodsubEvent> for NodeBehavior {
         if let FloodsubEvent::Message(message) = message {
             if let [topic] = &message.topics[..] {
                 match &String::from(topic.clone())[..] {
-                    PENDING_TX_FWD_TOPIC => println!(
-                        "Received pending tx {:?} bytes from {:?}",
-                        message.data.len(),
-                        message.source
-                    ),
+                    PENDING_TX_FWD_TOPIC => {
+                        let message_data: PendingTxMessage =
+                            bincode::deserialize(&message.data[..]).unwrap();
+                        println!(
+                            "Received pending tx {:?} bytes from {:?} in {:?} ms",
+                            message.data.len(),
+                            message.source,
+                            current_time_millis() - message_data.sent_time_millis
+                        );
+                    }
                     _ => println!("Unsupported topic {:?}", topic),
                 }
             } else {

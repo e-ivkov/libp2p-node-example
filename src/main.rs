@@ -1,5 +1,5 @@
 use crate::{
-    helper_fns::gen_random_bytes,
+    helper_fns::{current_time_millis, gen_random_bytes},
     node::{NodeBehavior, Stats},
 };
 
@@ -82,10 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Poll::Ready(Some(_)) => {
                 //Simulate pending transactions data
                 let tx_message = node::PendingTxMessage {
-                    sent_time_millis: SystemTime::now()
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .expect("Failed to get duration since UNIX_EPOCH.")
-                        .as_millis(),
+                    sent_time_millis: current_time_millis(),
                     data: gen_random_bytes(TX_BYTES),
                 };
                 println!("Forwarding pending tx data");
