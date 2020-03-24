@@ -13,6 +13,7 @@ use libp2p::{
     swarm::NetworkBehaviourEventProcess,
     Multiaddr, PeerId, Swarm,
 };
+use std::time::SystemTime;
 use std::{
     error::Error,
     task::{Context, Poll},
@@ -80,9 +81,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         match pending_tx_stream.poll_next_unpin(cx) {
             Poll::Ready(Some(_)) => {
                 //Simulate pending transactions data
-                let tx_data = gen_random_bytes(TX_BYTES);
+                let tx_message = node::PendingTxMessage {
+                    sent_time_millis: SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .expect("Failed to get duration since UNIX_EPOCH.")
+                        .as_millis(),
+                    data: gen_random_bytes(TX_BYTES),
+                };
                 println!("Forwarding pending tx data");
-                swarm.floodsub.publish(floodsub_topic.clone(), tx_data);
+                swarm.floodsub.publish(
+                    floodsub_topic.clone(),
+                    bincode::serialize(&tx_message).expect("Failed to serialize message."),
+                );
             }
             Poll::Ready(None) => panic!("Interval stream closed"),
             Poll::Pending => (),

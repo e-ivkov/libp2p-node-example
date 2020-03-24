@@ -16,6 +16,14 @@ pub const BLOCK_VOTE_TOPIC: &str = "block_vote";
 //window size of requests to store and use for statistics
 pub const WINDOW_SIZE: usize = 100;
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct PendingTxMessage {
+    pub sent_time_millis: u128,
+    pub data: Vec<u8>,
+}
+
 // We create a custom network behaviour that combines floodsub and mDNS.
 // In the future, we want to improve libp2p to make this easier to do.
 // Use the derive to generate delegating NetworkBehaviour impl and require the
