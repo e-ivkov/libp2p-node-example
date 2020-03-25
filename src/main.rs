@@ -21,19 +21,70 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
+extern crate clap;
+use clap::{value_t, App, Arg};
 
 pub mod helper_fns;
 pub mod node;
 
-//Message size restrictions are 1 MiB, though noticed that sometimes smaller messages also do not propagate
+//Message size restrictions are 2048 bytes, as mentioned in issue https://github.com/libp2p/rust-libp2p/issues/991
 const TX_BYTES: usize = 1000;
 const TX_INTERVAL_SEC: usize = 5;
 
 //Node lives this much seconds, then it saves the stats to a file and exits
 const NODE_TTL: f64 = 100.0;
 
+//window size of requests to store and use for statistics
+pub const STATS_WINDOW_SIZE: usize = 100;
+
 fn main() -> Result<(), Box<dyn Error>> {
     //env_logger::init();
+    let matches = App::new("libp2p-node-example")
+        .version("0.1.0")
+        .author("Egor Ivkov e.o.ivkov@gmail.com")
+        .about("Shows libp2p usage scenario as a blockchain node. It is mainly an example to get performance stats of libp2p.")
+        .arg(
+            Arg::with_name("tx_bytes")
+                .long("tx_bytes")
+                .value_name("usize")
+                .help("Number of pending tx data bytes to generate and forward between nodes. Upper limit is 2048 bytes.")
+                .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("tx_interval_sec")
+                .long("tx_interval_sec")
+                .value_name("usize")
+                .help("Interval between sending pending transactions. Simulates the process of getting transactions from clients.")
+                .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("node_ttl")
+                .long("node_ttl")
+                .value_name("f64")
+                .help("Number of seconds before this node exits and saves stats.")
+                .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("stats_window_size")
+                .long("stats_window_size")
+                .value_name("usize")
+                .help("Number of requests/responses that the stats struct stores to calculate mean.")
+                .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("node_addr")
+                .long("node_addr")
+                .value_name("Multiaddr")
+                .help("Valid address of node to reach to connect to swarm.")
+                .takes_value(true)
+        )
+        .get_matches();
+
+    let tx_bytes = value_t!(matches, "tx_bytes", usize).unwrap_or(TX_BYTES);
+    let tx_interval_sec = value_t!(matches, "tx_interval_sec", usize).unwrap_or(TX_INTERVAL_SEC);
+    let node_ttl = value_t!(matches, "node_ttl", f64).unwrap_or(NODE_TTL);
+    let stats_window_size =
+        value_t!(matches, "stats_window_size", usize).unwrap_or(STATS_WINDOW_SIZE);
 
     // Create a random PeerId
     let local_key = identity::Keypair::generate_ed25519();
@@ -48,13 +99,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Create a Swarm to manage peers and events
     let mut swarm = {
-        let mut behaviour = NodeBehavior::new(local_peer_id.clone())?;
+        let mut behaviour = NodeBehavior::new(local_peer_id.clone(), stats_window_size)?;
         behaviour.floodsub.subscribe(floodsub_topic.clone());
         Swarm::new(transport, behaviour, local_peer_id)
     };
 
     // Reach out to another node if specified
-    if let Some(to_dial) = std::env::args().nth(1) {
+    if let Some(to_dial) = matches.value_of("node_addr") {
         let addr: Multiaddr = to_dial.parse()?;
         Swarm::dial_addr(&mut swarm, addr)?;
         println!("Dialed {:?}", to_dial)
@@ -64,9 +115,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut stdin = io::BufReader::new(io::stdin()).lines();
 
     // Simulate periodic appearance of pending transactions
-    let mut pending_tx_stream = stream::interval(Duration::from_secs(TX_INTERVAL_SEC as u64));
+    let mut pending_tx_stream = stream::interval(Duration::from_secs(tx_interval_sec as u64));
 
-    let mut exit_alert = stream::interval(Duration::from_secs_f64(NODE_TTL));
+    let mut exit_alert = stream::interval(Duration::from_secs_f64(node_ttl));
 
     // Listen on all interfaces and whatever port the OS assigns
     Swarm::listen_on(&mut swarm, "/ip4/0.0.0.0/tcp/0".parse()?)?;
@@ -90,7 +141,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 //Simulate pending transactions data
                 let tx_message = node::PendingTxMessage {
                     sent_time_millis: current_time_millis(),
-                    data: gen_random_bytes(TX_BYTES),
+                    data: gen_random_bytes(tx_bytes),
                 };
                 println!("Forwarding pending tx data");
                 swarm.floodsub.publish(

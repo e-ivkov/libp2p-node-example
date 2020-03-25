@@ -14,9 +14,6 @@ pub const PENDING_TX_FWD_TOPIC: &str = "pending_tx";
 pub const TIME_SYNC_TOPIC: &str = "time_sync";
 pub const BLOCK_VOTE_TOPIC: &str = "block_vote";
 
-//window size of requests to store and use for statistics
-pub const WINDOW_SIZE: usize = 100;
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -42,14 +39,14 @@ pub struct NodeBehavior {
 }
 
 impl NodeBehavior {
-    pub fn new(peer_id: PeerId) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(peer_id: PeerId, window_size: usize) -> Result<Self, Box<dyn std::error::Error>> {
         let mdns = Mdns::new()?;
         let ping = Ping::default();
         Ok(NodeBehavior {
             floodsub: Floodsub::new(peer_id.clone()),
             mdns,
             ping,
-            stats: Stats::new(WINDOW_SIZE, peer_id),
+            stats: Stats::new(window_size, peer_id),
         })
     }
 }

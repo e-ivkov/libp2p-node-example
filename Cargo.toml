@@ -12,6 +12,7 @@ futures = "0.3.4"
 chashmap = "2.2.2"
 rand = "0.7.3"
 bincode = "1.2.1"
+clap = "2.33.0"
 
 [dependencies.serde]
 version = "1.0.105"
