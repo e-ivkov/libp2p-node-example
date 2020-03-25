@@ -11,6 +11,7 @@ use libp2p::{
     mdns::Mdns,
     ping::Ping,
     swarm::NetworkBehaviourEventProcess,
+    tcp::TcpConfig,
     Multiaddr, PeerId, Swarm,
 };
 use std::time::SystemTime;
@@ -22,10 +23,12 @@ use std::{
     time::Duration,
 };
 extern crate clap;
+use crate::transport::upgrade_dev_transport;
 use clap::{value_t, App, Arg};
 
 pub mod helper_fns;
 pub mod node;
+pub mod transport;
 
 //Message size restrictions are 2048 bytes, as mentioned in issue https://github.com/libp2p/rust-libp2p/issues/991
 const TX_BYTES: usize = 1000;
@@ -91,6 +94,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let local_peer_id = PeerId::from(local_key.public());
     println!("Local peer id: {:?}", local_peer_id);
 
+    let tcp_transport = upgrade_dev_transport(TcpConfig::new(), local_key.clone())?;
+
     // Set up a an encrypted DNS-enabled TCP Transport over the Mplex and Yamux protocols
     let transport = libp2p::build_development_transport(local_key)?;
 
@@ -101,7 +106,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut swarm = {
         let mut behaviour = NodeBehavior::new(local_peer_id.clone(), stats_window_size)?;
         behaviour.floodsub.subscribe(floodsub_topic.clone());
-        Swarm::new(transport, behaviour, local_peer_id)
+        Swarm::new(tcp_transport, behaviour, local_peer_id)
     };
 
     // Reach out to another node if specified
