@@ -36,7 +36,7 @@ const TX_BYTES: usize = 1000;
 const TX_INTERVAL_SEC: usize = 5;
 
 //Node lives this much seconds, then it saves the stats to a file and exits
-const NODE_TTL: f64 = 100.0;
+const NODE_TTL: f64 = 1000.0;
 
 //window size of requests to store and use for statistics
 pub const STATS_WINDOW_SIZE: usize = 100;
