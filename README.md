@@ -8,9 +8,10 @@ It is mainly an example to get performance stats of libp2p.
 3. mdns (mainly for development purposes, to test faster on local machine)
 ### Stats gathered
 The node gathers the following stats in a `stats.txt`, which it saves on exit.
-1. Average ping time to each peer
-2. Average transmission rate (through floodsub) to each peer measured in bytes per unit of time
+1. Mean ping time to each peer
+2. Mean transmission rate (through floodsub) to each peer measured in bytes per unit of time
 
+All mean stats are gathered with 95% confidence interval.
 This stats are saved only for the latest N requests, where N is specified as command line argument
 `stats_window size`
 ### What the node does
