@@ -12,7 +12,8 @@ use libp2p::{
     ping::Ping,
     swarm::NetworkBehaviourEventProcess,
     tcp::TcpConfig,
-    Multiaddr, PeerId, Swarm,
+    websocket::WsConfig,
+    Multiaddr, PeerId, Swarm, Transport,
 };
 use std::time::SystemTime;
 use std::{
@@ -39,6 +40,9 @@ const NODE_TTL: f64 = 100.0;
 
 //window size of requests to store and use for statistics
 pub const STATS_WINDOW_SIZE: usize = 100;
+
+pub const TCP_TRANSPORT: &str = "tcp";
+pub const WEBSOCKET_TRANSPORT: &str = "websocket";
 
 fn main() -> Result<(), Box<dyn Error>> {
     //env_logger::init();
@@ -81,6 +85,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .help("Valid address of node to reach to connect to swarm.")
                 .takes_value(true)
         )
+        .arg(
+            Arg::with_name("transport")
+                .long("transport")
+                .short("t")
+                .possible_values(&[TCP_TRANSPORT, WEBSOCKET_TRANSPORT])
+                .help("Specific transport to use for libp2p higher level protocols.")
+                .takes_value(true)
+        )
         .get_matches();
 
     let tx_bytes = value_t!(matches, "tx_bytes", usize).unwrap_or(TX_BYTES);
@@ -94,11 +106,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let local_peer_id = PeerId::from(local_key.public());
     println!("Local peer id: {:?}", local_peer_id);
 
-    let tcp_transport = upgrade_dev_transport(TcpConfig::new(), local_key.clone())?;
-
-    // Set up a an encrypted DNS-enabled TCP Transport over the Mplex and Yamux protocols
-    let transport = libp2p::build_development_transport(local_key)?;
-
     // Create a Floodsub topic
     let floodsub_topic = floodsub::Topic::new(node::PENDING_TX_FWD_TOPIC);
 
@@ -106,7 +113,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut swarm = {
         let mut behaviour = NodeBehavior::new(local_peer_id.clone(), stats_window_size)?;
         behaviour.floodsub.subscribe(floodsub_topic.clone());
-        Swarm::new(tcp_transport, behaviour, local_peer_id)
+        match matches.value_of("transport") {
+            Some(TCP_TRANSPORT) => Swarm::new(
+                upgrade_dev_transport(TcpConfig::new(), local_key.clone())?,
+                behaviour,
+                local_peer_id,
+            ),
+            Some(WEBSOCKET_TRANSPORT) => Swarm::new(
+                upgrade_dev_transport(WsConfig::new(TcpConfig::new()), local_key.clone())?,
+                behaviour,
+                local_peer_id,
+            ),
+            _ => Swarm::new(
+                libp2p::build_development_transport(local_key.clone())?,
+                behaviour,
+                local_peer_id,
+            ),
+        }
     };
 
     // Reach out to another node if specified
@@ -124,8 +147,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut exit_alert = stream::interval(Duration::from_secs_f64(node_ttl));
 
+    let address = if let Some(WEBSOCKET_TRANSPORT) = matches.value_of("transport") {
+        "/ip4/0.0.0.0/tcp/0/ws"
+    } else {
+        "/ip4/0.0.0.0/tcp/0"
+    };
+
     // Listen on all interfaces and whatever port the OS assigns
-    Swarm::listen_on(&mut swarm, "/ip4/0.0.0.0/tcp/0".parse()?)?;
+    Swarm::listen_on(&mut swarm, address.parse()?)?;
 
     // Kick it off
     let mut listening = false;
