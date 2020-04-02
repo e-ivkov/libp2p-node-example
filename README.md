@@ -37,3 +37,5 @@ All the nodes should be deployed on different machines, preferably in different 
 2. Deploy other nodes with the first node's address as a cli parameter
 3. Wait for the first node to exit (exit time can be also specified in cli args)
 4. Retrieve `stats.txt` from the first node's machine. It should be located near the executable file.
+
+Note: by default each node runs for 1000 seconds.
