@@ -13,7 +13,7 @@ The node gathers the following stats in a `stats.txt`, which it saves on exit.
 
 All mean stats are gathered with 95% confidence interval.
 This stats are saved only for the latest N requests, where N is specified as command line argument
-`stats_window size`
+`stats_window_size`
 ### What the node does
 1. Connects to the swarm on startup
 2. Periodically pings other nodes
@@ -25,6 +25,7 @@ This stats are saved only for the latest N requests, where N is specified as com
 1. Clone the repository
 2. `cargo run -- --help` to get the list of possible parameters
 3. `cargo run -- --node_addr=ADDR` to deploy and connect to the swarm through the node with `ADDR` address
+4. _(Optional)_ Logging can be turned on by setting `RUST_LOG=info` before starting node. Example: `RUST_LOG=info cargo run`
 
 ## Test procedure
 As initially this repository is meant as a performance testing example for libp2p,
