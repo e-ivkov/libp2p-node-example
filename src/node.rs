@@ -56,7 +56,7 @@ impl NetworkBehaviourEventProcess<PingEvent> for NodeBehavior {
     fn inject_event(&mut self, message: PingEvent) {
         if let Result::Ok(PingSuccess::Ping { rtt }) = message.result {
             let peer_id = message.peer;
-            println!("Ping {:?} {:?}", peer_id.clone(), rtt);
+            info!("Ping {:?} {:?}", peer_id.clone(), rtt);
             self.stats.add_ping(peer_id.to_string(), rtt)
         }
     }
@@ -73,7 +73,7 @@ impl NetworkBehaviourEventProcess<FloodsubEvent> for NodeBehavior {
                             bincode::deserialize(&message.data[..]).unwrap();
                         let elapsed_time_millis =
                             current_time_millis() - message_data.sent_time_millis;
-                        println!(
+                        info!(
                             "Received pending tx {:?} bytes from {:?} in {:?} ms",
                             message.data.len(),
                             message.source,
@@ -87,10 +87,10 @@ impl NetworkBehaviourEventProcess<FloodsubEvent> for NodeBehavior {
                             message.data.len() as u32,
                         );
                     }
-                    _ => println!("Unsupported topic {:?}", topic),
+                    _ => info!("Unsupported topic {:?}", topic),
                 }
             } else {
-                println!("Received more than 1 topic. Topics: {:?}", message.topics)
+                info!("Received more than 1 topic. Topics: {:?}", message.topics)
             }
         }
     }

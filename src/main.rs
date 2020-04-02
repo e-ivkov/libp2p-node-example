@@ -24,6 +24,10 @@ use std::{
     time::Duration,
 };
 extern crate clap;
+
+#[macro_use]
+extern crate log;
+
 use crate::transport::upgrade_dev_transport;
 use clap::{value_t, App, Arg};
 
@@ -45,7 +49,7 @@ pub const TCP_TRANSPORT: &str = "tcp";
 pub const WEBSOCKET_TRANSPORT: &str = "websocket";
 
 fn main() -> Result<(), Box<dyn Error>> {
-    //env_logger::init();
+    env_logger::init();
     let matches = App::new("libp2p-node-example")
         .version("0.1.0")
         .author("Egor Ivkov e.o.ivkov@gmail.com")
@@ -136,7 +140,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let Some(to_dial) = matches.value_of("node_addr") {
         let addr: Multiaddr = to_dial.parse()?;
         Swarm::dial_addr(&mut swarm, addr)?;
-        println!("Dialed {:?}", to_dial)
+        info!("Dialed {:?}", to_dial)
     }
 
     // Read full lines from stdin
@@ -163,7 +167,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             match stdin.try_poll_next_unpin(cx)? {
                 Poll::Ready(Some(line)) => {
                     if line == "stats" {
-                        println!("{}", swarm.stats)
+                        info!("{}", swarm.stats)
                     }
                 }
                 Poll::Ready(None) => panic!("Stdin closed"),
@@ -177,7 +181,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     sent_time_millis: current_time_millis(),
                     data: gen_random_bytes(tx_bytes),
                 };
-                println!("Forwarding pending tx data");
+                info!("Forwarding pending tx data");
                 swarm.floodsub.publish(
                     floodsub_topic.clone(),
                     bincode::serialize(&tx_message).expect("Failed to serialize message."),
@@ -188,7 +192,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         loop {
             match swarm.poll_next_unpin(cx) {
-                Poll::Ready(Some(event)) => println!("{:?}", event),
+                Poll::Ready(Some(event)) => info!("{:?}", event),
                 Poll::Ready(None) => return Poll::Ready(Ok(())),
                 Poll::Pending => {
                     if !listening {
@@ -203,9 +207,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         match exit_alert.poll_next_unpin(cx) {
             Poll::Ready(Some(_)) => {
-                println!("Saving stats");
+                info!("Saving stats");
                 swarm.stats.save_to_file("stats.txt")?;
-                println!("Exiting");
+                info!("Exiting");
                 Poll::Ready(Ok(()))
             }
             Poll::Ready(None) => panic!("Exit stream closed"),

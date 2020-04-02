@@ -14,6 +14,8 @@ rand = "0.7.3"
 bincode = "1.2.1"
 clap = "2.33.0"
 p2p_node_stats = { git = "https://github.com/eadventurous/p2p-node-stats"}
+log = "0.4.0"
+env_logger = "0.7.1"
 
 [dependencies.serde]
 version = "1.0.105"
