@@ -1,6 +1,6 @@
 use crate::{
     helper_fns::{current_time_millis, gen_random_bytes},
-    node::{NodeBehavior, Stats},
+    node::NodeBehavior,
 };
 
 use async_std::{io, stream, task};
@@ -204,8 +204,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         match exit_alert.poll_next_unpin(cx) {
             Poll::Ready(Some(_)) => {
                 println!("Saving stats");
-                let mut file = File::create("stats.txt")?;
-                file.write_all(swarm.stats.to_string().as_bytes())?;
+                swarm.stats.save_to_file("stats.txt")?;
                 println!("Exiting");
                 Poll::Ready(Ok(()))
             }

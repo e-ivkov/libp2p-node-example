@@ -14,6 +14,7 @@ pub const PENDING_TX_FWD_TOPIC: &str = "pending_tx";
 pub const TIME_SYNC_TOPIC: &str = "time_sync";
 pub const BLOCK_VOTE_TOPIC: &str = "block_vote";
 
+use p2p_node_stats::Stats;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -34,7 +35,6 @@ pub struct NodeBehavior {
 
     // Struct fields which do not implement NetworkBehaviour need to be ignored
     #[behaviour(ignore)]
-    #[allow(dead_code)]
     pub stats: Stats,
 }
 
@@ -46,7 +46,7 @@ impl NodeBehavior {
             floodsub: Floodsub::new(peer_id.clone()),
             mdns,
             ping,
-            stats: Stats::new(window_size, peer_id),
+            stats: Stats::new(window_size, peer_id.to_string()),
         })
     }
 }
@@ -57,14 +57,7 @@ impl NetworkBehaviourEventProcess<PingEvent> for NodeBehavior {
         if let Result::Ok(PingSuccess::Ping { rtt }) = message.result {
             let peer_id = message.peer;
             println!("Ping {:?} {:?}", peer_id.clone(), rtt);
-            let ping_to_peers = &self.stats.pings_to_peers;
-            if !ping_to_peers.contains_key(&peer_id) {
-                ping_to_peers.insert_new(peer_id.clone(), Vec::new())
-            }
-            ping_to_peers
-                .get_mut(&peer_id)
-                .expect("Failed to get peer entry")
-                .push_lossy(rtt, self.stats.window_size)
+            self.stats.add_ping(peer_id.to_string(), rtt)
         }
     }
 }
@@ -86,20 +79,13 @@ impl NetworkBehaviourEventProcess<FloodsubEvent> for NodeBehavior {
                             message.source,
                             elapsed_time_millis
                         );
-                        let transmission_rates = &self.stats.transmissions_rates;
+
                         let peer_id = message.source;
-                        if !transmission_rates.contains_key(&peer_id) {
-                            transmission_rates.insert_new(peer_id.clone(), Vec::new())
-                        }
-                        transmission_rates
-                            .get_mut(&peer_id)
-                            .expect("Failed to get peer entry")
-                            .push_lossy(
-                                //put transmission rate which is elapsed time per byte
-                                Duration::from_millis(elapsed_time_millis as u64)
-                                    / message.data.len() as u32,
-                                self.stats.window_size,
-                            )
+                        self.stats.add_transmission(
+                            peer_id.to_string(),
+                            Duration::from_millis(elapsed_time_millis as u64),
+                            message.data.len() as u32,
+                        );
                     }
                     _ => println!("Unsupported topic {:?}", topic),
                 }
@@ -127,138 +113,5 @@ impl NetworkBehaviourEventProcess<MdnsEvent> for NodeBehavior {
                 }
             }
         }
-    }
-}
-
-pub struct Stats {
-    pings_to_peers: CHashMap<PeerId, Vec<Duration>>,
-    transmissions_rates: CHashMap<PeerId, Vec<Duration>>,
-    window_size: usize,
-    peer_id: PeerId,
-}
-
-impl Stats {
-    pub fn new(window_size: usize, peer_id: PeerId) -> Self {
-        Self {
-            pings_to_peers: CHashMap::new(),
-            transmissions_rates: CHashMap::new(),
-            window_size,
-            peer_id,
-        }
-    }
-}
-
-use std::fmt;
-
-fn durations_mean(durations: &Vec<Duration>) -> Option<Duration> {
-    if durations.is_empty() {
-        None
-    } else {
-        Some(
-            durations
-                .iter()
-                .fold(Duration::from_secs(0), |acc, x| acc + *x)
-                / durations.len() as u32,
-        )
-    }
-}
-
-#[test]
-fn correct_durations_mean() {
-    let durations = vec![
-        Duration::from_secs(1),
-        Duration::from_secs(3),
-        Duration::from_secs(5),
-    ];
-    assert_eq!(durations_mean(&durations).unwrap(), Duration::from_secs(3));
-}
-
-fn durations_std_dev(durations: &Vec<Duration>) -> Option<Duration> {
-    let mean = durations_mean(durations)?.as_secs_f64();
-    Some(Duration::from_secs_f64(
-        (durations
-            .iter()
-            .fold(0f64, |acc, x| acc + (x.as_secs_f64() - mean).powi(2))
-            / (durations.len() as f64))
-            .sqrt(),
-    ))
-}
-
-#[test]
-fn correct_durations_std_dev() {
-    let durations = vec![
-        Duration::from_secs(1),
-        Duration::from_secs(3),
-        Duration::from_secs(5),
-    ];
-    let epsilon = 0.01;
-    let std_dev = durations_std_dev(&durations).unwrap().as_secs_f64();
-    assert!((std_dev - 1.63).abs() < epsilon);
-}
-
-/// Durations mean error with confidence interval of 95%
-/// For correct estimation `durations.len()` should be at least `30`.
-fn durations_error_with_ci(durations: &Vec<Duration>) -> Option<Duration> {
-    // Z-value for 95 percent confidence interval
-    let z = 1.96;
-    let std_dev = durations_std_dev(durations)?;
-    Some(Duration::from_secs_f64(
-        z * std_dev.as_secs_f64() / (durations.len() as f64).sqrt(),
-    ))
-}
-
-impl fmt::Display for Stats {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ping_by_peer: String = self
-            .pings_to_peers
-            .clone()
-            .into_iter()
-            .map(|(peer, durations)| {
-                match (
-                    durations_mean(&durations),
-                    durations_error_with_ci(&durations),
-                ) {
-                    (Some(duration), Some(error)) => {
-                        format!("{:?} {:?}±{:?}\n", peer, duration, error)
-                    }
-                    _ => format!("No ping data for peer {:?}", peer),
-                }
-            })
-            .collect();
-
-        let transmission_rate_by_peer: String = self
-            .transmissions_rates
-            .clone()
-            .into_iter()
-            .map(|(peer, durations)| {
-                match (
-                    durations_mean(&durations),
-                    durations_error_with_ci(&durations),
-                ) {
-                    (Some(duration), Some(error)) => {
-                        format!("{:?} {:?}±{:?} per byte\n", peer, duration, error)
-                    }
-                    _ => format!("No transmission data for peer {:?}", peer),
-                }
-            })
-            .collect();
-        write!(
-            f,
-            "{:?}\nPing mean for each peer:\n{}Transmission rate mean by peer:\n{}",
-            self.peer_id, ping_by_peer, transmission_rate_by_peer
-        )
-    }
-}
-
-pub trait PushLossy<T> {
-    fn push_lossy(&mut self, element: T, window_size: usize);
-}
-
-impl<T> PushLossy<T> for Vec<T> {
-    fn push_lossy(&mut self, element: T, window_size: usize) {
-        if self.len() >= window_size {
-            self.remove(0);
-        }
-        self.push(element);
     }
 }
