@@ -83,8 +83,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .takes_value(true)
         )
         .arg(
-            Arg::with_name("node_addr")
-                .long("node_addr")
+            Arg::with_name("connect")
+                .long("connect")
+                .short("c")
                 .value_name("Multiaddr")
                 .help("Valid address of node to reach to connect to swarm.")
                 .takes_value(true)
